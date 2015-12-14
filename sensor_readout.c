@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <mqueue.h>
 
+#include "bumblebeeTypes.h"
+
 int push(ev3_sensor_ptr pushS){
 		ev3_update_sensor_val(pushS);
 		return pushS->val_data[0].s32;
@@ -38,7 +40,9 @@ void *control(void *vargp){
 	ev3_open_sensor(compassS); 
 	ev3_open_sensor(distanceS);
     
-    mqd_t mqWriter = (mqd_t)vargp;
+    struct threadParams params = (struct threadParams)vargp;
+    mqWriter = params.mq;
+    instructionLock = params.mutex;
 
     while(1){	            
         distanceRO = distance(distanceS);
