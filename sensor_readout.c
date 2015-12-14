@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <mqueue.h>
 
-#include "bumblebeeTypes.h"
+#include "bumblebeeTypesAndDefs.h"
 
 int push(ev3_sensor_ptr pushS){
 		ev3_update_sensor_val(pushS);
@@ -27,7 +27,9 @@ int distance(ev3_sensor_ptr distanceS){
 
 
 void *control(void *vargp){
-    int distanceRO, colorRO, pushRO, compassRO, msg;    
+    int distanceRO, colorRO, pushRO, compassRO, msg, status;    
+	mqd_t mqWriter;
+	pthread_mutex_t *instructionLock;	
 
 	ev3_sensor_ptr sensors  = ev3_load_sensors();
 	ev3_sensor_ptr pushS     = ev3_search_sensor_by_port(sensors,1);
@@ -40,9 +42,10 @@ void *control(void *vargp){
 	ev3_open_sensor(compassS); 
 	ev3_open_sensor(distanceS);
     
-    struct threadParams params = (struct threadParams)vargp;
-    mqWriter = params.mq;
-    instructionLock = params.mutex;
+    struct threadParams *params;
+	params = (struct threadParams*)vargp;
+    mqWriter = params->mq;
+    instructionLock = params->mutex;
 
     while(1){	            
         distanceRO = distance(distanceS);
@@ -52,13 +55,15 @@ void *control(void *vargp){
     
         msg = MSG_KEEP_SEARCHING;
     
-        if(disanceRO > BALL_IN_RANGE_DISTANCE || colorRO > BALL_IN_RANGE_COLOR){
+        if(distanceRO < BALL_IN_RANGE_DISTANCE || colorRO > BALL_IN_RANGE_COLOR){
             msg = MSG_BALL_IN_RANGE;
         }else if(pushRO == 1){
             msg = MSG_BUTTON_PUSHED;
         }
-
+        printf("locking\n");
+        pthread_mutex_lock(instructionLock); 
         status = mq_send(mqWriter, (char*)&msg, sizeof(int), 1);
+        printf("instruction sent: %i\n", msg);
         if (status == -1)
             perror("mq_send failure"); 
         

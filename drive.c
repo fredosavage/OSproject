@@ -1,12 +1,15 @@
 #include "motor_movement.h"
 #include "sensor_readout.h"
-#include "bumblebeeTypes.h"
+#include "bumblebeeTypesAndDefs.h"
 #include <mqueue.h>
 
 #define MQ_NAME "/instructions" 
 
 #define MQ_SIZE 1
 #define PMODE 0666 
+
+#define TURN 0
+#define MOVE 1
 
 void init_queue (mqd_t *mq_desc, int open_flags) {
   struct mq_attr attr;
@@ -41,12 +44,12 @@ int get_integer_from_mq (mqd_t mq_desc) {
 void main(void){
     int instruction;
     mqd_t mqWriter, mqReader;
-    pthread_mutex_t = instructionLock;
+    pthread_mutex_t instructionLock;
     init_queue(&mqWriter, O_CREAT | O_WRONLY);
     // CHECK THIS LINE
-    struct threadParams controlParams = {mqWriter, instructionLock}; 
-    pthread_t = controlThread;
-    pthread_create(&controlThread, NULL, control, controlParams);
+    struct threadParams controlParams = {mqWriter, &instructionLock}; 
+    pthread_t controlThread;
+    pthread_create(&controlThread, NULL, control, &controlParams);
 
     init_queue(&mqReader, O_RDONLY);
 
@@ -63,21 +66,34 @@ void main(void){
 		motor = motor->next;
 	}
 	 
+    int lastSearch = MOVE;
 
     while(1){
+        printf("unlocking\n");
+        pthread_mutex_unlock(&instructionLock);
         instruction = get_integer_from_mq(mqReader);
+        printf("instruction revieved: %i\n", instruction);
         switch(instruction){
             case MSG_KEEP_SEARCHING:
-                //turn and search
-                printf("searching");
+                //turn and search  
+                if(lastSearch == MOVE){
+                    turn(leftM, rightM, 4000, 360); 
+                    lastSearch = TURN;
+                }else{
+                    turn(leftM, rightM, 1000, 90);
+                    move(leftM, rightM, 1000, 200);
+                    lastSearch = MOVE;
+                }
+                printf("searching\n");
                 break;
             case MSG_BALL_IN_RANGE:
                 // grab the ball
-                printf("searching");
+                grab(middleM);
+                printf("BALL IN RANGE BITCH\n");
                 break;
             case MSG_BUTTON_PUSHED:
                 // handle push
-                printf("button pushed");
+                printf("button pushed\n");
                 break;
             default:
                 break;
